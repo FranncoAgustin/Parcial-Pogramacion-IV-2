@@ -19,10 +19,7 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 # ALLOWED_HOSTS: para local y Render
-ALLOWED_HOSTS = os.environ.get(
-    "ALLOWED_HOSTS",
-    "localhost,127.0.0.1"
-).split(",")
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1"]
 
 # Para evitar problemas de CSRF en Render (lo completás después con tu dominio)
 CSRF_TRUSTED_ORIGINS = os.environ.get(
