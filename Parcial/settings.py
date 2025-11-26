@@ -1,6 +1,10 @@
 from pathlib import Path
 import os
 import dj_database_url
+from dotenv import load_dotenv
+
+# Cargar variables del .env local
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,20 +12,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # CONFIGURACIÓN BÁSICA
 # =========================
 
-# Para simplificar el parcial dejamos una key fija,
-# pero en Render podés sobreescribirla con SECRET_KEY en env vars.
 SECRET_KEY = os.environ.get(
     "SECRET_KEY",
     "django-insecure-2ke0f#rl5rx)9wn0lq0aeqebe$n!vlekb=p4^7dpo-^^gperf#"
 )
 
-# DEBUG: True en local, False en Render (lo seteás en env)
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-# ALLOWED_HOSTS: para local y Render
 ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1"]
 
-# Para evitar problemas de CSRF en Render (lo completás después con tu dominio)
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
     "http://localhost,http://127.0.0.1"
@@ -52,7 +51,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    # Whitenoise para servir estáticos en Render
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -93,7 +91,6 @@ WSGI_APPLICATION = "Parcial.wsgi.application"
 # BASE DE DATOS
 # =========================
 
-# Por defecto, SQLite (local / desarrollo)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -101,12 +98,11 @@ DATABASES = {
     }
 }
 
-# Si en Render seteás DATABASE_URL, se usa Postgres automáticamente
 if os.environ.get("DATABASE_URL"):
     DATABASES["default"] = dj_database_url.config(
         default=os.environ["DATABASE_URL"],
         conn_max_age=600,
-        ssl_require=False,  # en Render suele ser True, pero para el parcial podés dejarlo así
+        ssl_require=False,
     )
 
 
@@ -139,15 +135,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# Donde collectstatic los deja (Render)
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Para archivos estáticos propios (si querés)
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-# Whitenoise: comprime y cachea
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
@@ -161,25 +154,13 @@ LOGOUT_REDIRECT_URL = "cuentas:login"
 
 
 # =========================
-# EMAIL
+# EMAIL (SendGrid)
 # =========================
 
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "brguix57@gmail.com")
 
-if DEBUG:
-    # Local: mails en consola (como ya venías usando)
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    DEFAULT_FROM_EMAIL = "no-reply@parcial.local"
-else:
-    # Producción (Render): usar SMTP real (Gmail u otro)
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
-    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-    EMAIL_USE_TLS = True
-    DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
-
+# → ESTA debe existir tanto en tu .env local como en Render
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 
 
 # =========================

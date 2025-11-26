@@ -1,28 +1,51 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib import messages
-from django.core.mail import send_mail
 from django.conf import settings
+
+import sendgrid
+from sendgrid.helpers.mail import Mail
 
 from .forms import RegistroForm
 from django.contrib.auth.forms import AuthenticationForm
 
 
+# --------------------------------------------
+# Función para enviar emails reales con SendGrid
+# --------------------------------------------
+def enviar_sendgrid(to_email, subject, html_content):
+    """Enviar email real usando SendGrid API."""
+    sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+    email = Mail(
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_content,
+    )
+    sg.send(email)
+
+
+# --------------------------------------------
+# Registro de usuario
+# --------------------------------------------
 def registro_view(request):
     if request.method == "POST":
         form = RegistroForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            # Setear la contraseña desde el campo del formulario
+
+            # Establecer contraseña
             user.set_password(form.cleaned_data["password"])
             user.save()
 
-            # Enviar mail de bienvenida al email con el que se registró
-            send_mail(
+            # Enviar email real de bienvenida
+            enviar_sendgrid(
+                user.email,
                 "Bienvenido/a al sistema de alumnos",
-                f"Hola {user.username}, gracias por registrarte.",
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
+                f"""
+                <p>Hola <strong>{user.username}</strong>,</p>
+                <p>Gracias por registrarte en el sistema de alumnos.</p>
+                """
             )
 
             messages.success(
@@ -36,6 +59,9 @@ def registro_view(request):
     return render(request, "cuentas/registro.html", {"form": form})
 
 
+# --------------------------------------------
+# Login
+# --------------------------------------------
 def login_view(request):
     if request.method == "POST":
         form = AuthenticationForm(request, data=request.POST)
@@ -51,6 +77,9 @@ def login_view(request):
     return render(request, "cuentas/login.html", {"form": form})
 
 
+# --------------------------------------------
+# Logout
+# --------------------------------------------
 def logout_view(request):
     logout(request)
     messages.info(request, "Sesión cerrada correctamente.")

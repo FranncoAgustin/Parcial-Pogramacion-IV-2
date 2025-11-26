@@ -1,13 +1,34 @@
 from django.shortcuts import render
-from django.core.mail import EmailMessage
 from django.contrib import messages
+from django.conf import settings
 
 from .forms import ScraperForm
 
 import requests
 from bs4 import BeautifulSoup
 
+import sendgrid
+from sendgrid.helpers.mail import Mail
 
+
+# -------------------------------
+# SendGrid helper
+# -------------------------------
+def enviar_sendgrid(to_email, subject, html_content):
+    """Enviar email real usando SendGrid API."""
+    sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+    email = Mail(
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_content,
+    )
+    sg.send(email)
+
+
+# -------------------------------
+# Vista principal del scraper
+# -------------------------------
 def scraper_view(request):
     resultados = []
 
@@ -18,7 +39,7 @@ def scraper_view(request):
             email_destino = form.cleaned_data["email"]
 
             try:
-                # 1) Hacer la búsqueda en Wikipedia con headers de navegador
+                # 1) Búsqueda en Wikipedia
                 url = "https://es.wikipedia.org/w/index.php"
                 params = {"search": keyword}
                 headers = {
@@ -35,12 +56,12 @@ def scraper_view(request):
 
                 soup = BeautifulSoup(resp.text, "html.parser")
 
-                # 2) Intentar obtener lista de resultados
+                # 2) Extraer resultados
                 enlaces = soup.select(".mw-search-result-heading a")
                 if not enlaces:
                     enlaces = soup.select("#mw-content-text .mw-search-result-heading a")
 
-                # Si tampoco hay, capaz Wikipedia redirigió directo al artículo:
+                # Redirección a artículo único
                 if not enlaces:
                     titulo_unico = soup.select_one("#firstHeading")
                     if titulo_unico:
@@ -54,25 +75,27 @@ def scraper_view(request):
                         link = "https://es.wikipedia.org" + a.get("href")
                         resultados.append({"titulo": titulo, "link": link})
 
-                # 3) Armar cuerpo del correo
+                # 3) Formar HTML del correo
                 if resultados:
-                    cuerpo = f"Resultados de búsqueda para '{keyword}':\n\n"
+                    cuerpo_html = f"<h3>Resultados de búsqueda para '{keyword}':</h3><ul>"
                     for res in resultados:
-                        cuerpo += f"- {res['titulo']}: {res['link']}\n"
+                        cuerpo_html += f"<li><a href='{res['link']}'>{res['titulo']}</a></li>"
+                    cuerpo_html += "</ul>"
                 else:
-                    cuerpo = f"No se encontraron resultados para '{keyword}'."
+                    cuerpo_html = f"<p>No se encontraron resultados para '{keyword}'.</p>"
 
-                # 4) Enviar email
-                email = EmailMessage(
-                    subject=f"Resultados de scraping para '{keyword}'",
-                    body=cuerpo,
-                    to=[email_destino],
+                # 4) Enviar email con SendGrid (Render-friendly)
+                enviar_sendgrid(
+                    email_destino,
+                    f"Resultados de scraping para '{keyword}'",
+                    cuerpo_html
                 )
-                email.send()
 
-                messages.success(request, "Scraping realizado y correo enviado correctamente.")
+                messages.success(request, f"Scraping realizado y correo enviado a {email_destino} exitosamente.")
+
             except Exception as e:
                 messages.error(request, f"Ocurrió un error al realizar el scraping: {e}")
+
     else:
         form = ScraperForm()
 

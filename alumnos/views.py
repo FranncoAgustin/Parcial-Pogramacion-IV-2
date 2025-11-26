@@ -1,24 +1,66 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.core.mail import EmailMessage
 from django.contrib import messages
+from django.conf import settings
+
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from django.conf import settings
 from io import BytesIO
+
+import base64
+import sendgrid
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
 from .models import Alumno
 from .forms import AlumnoForm
 
+
+# -------------------------------
+# SendGrid: función para enviar PDF adjunto
+# -------------------------------
+def enviar_pdf_sendgrid(to_email, alumno, pdf_bytes):
+   
+    sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+
+    mensaje = Mail(
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to_emails=to_email,
+        subject=f"PDF del alumno {alumno.nombre} {alumno.apellido}",
+        html_content=(
+            f"<p>Adjunto PDF con los datos del alumno "
+            f"<strong>{alumno.nombre} {alumno.apellido}</strong>.</p>"
+        ),
+    )
+
+    # Convertir PDF a base64
+    archivo_b64 = base64.b64encode(pdf_bytes).decode()
+
+    attachment = Attachment(
+        FileContent(archivo_b64),
+        FileName("alumno.pdf"),
+        FileType("application/pdf"),
+        Disposition("attachment"),
+    )
+
+    mensaje.attachment = attachment
+
+    sg.send(mensaje)
+
+
+# -------------------------------
+# Dashboard: listar + crear alumnos
+# -------------------------------
 @login_required
 def dashboard_view(request):
     alumnos = Alumno.objects.filter(usuario=request.user)
+
     if request.method == "POST":
         form = AlumnoForm(request.POST)
         if form.is_valid():
             alumno = form.save(commit=False)
             alumno.usuario = request.user
             alumno.save()
+            messages.success(request, "Alumno creado correctamente.")
             return redirect("alumnos:dashboard")
     else:
         form = AlumnoForm()
@@ -28,16 +70,21 @@ def dashboard_view(request):
         "form": form,
     })
 
-@login_required
+
+# -------------------------------
+# Enviar PDF con datos del alumno
+# -------------------------------
 @login_required
 def enviar_pdf_view(request, pk):
     alumno = get_object_or_404(Alumno, pk=pk, usuario=request.user)
 
+    # Generar PDF en memoria
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
 
     pdf.setFont("Helvetica", 14)
     pdf.drawString(50, 750, "Datos del alumno")
+
     pdf.setFont("Helvetica", 12)
     pdf.drawString(50, 720, f"Nombre: {alumno.nombre}")
     pdf.drawString(50, 700, f"Apellido: {alumno.apellido}")
@@ -50,25 +97,19 @@ def enviar_pdf_view(request, pk):
     buffer.seek(0)
     pdf_bytes = buffer.read()
 
-    email_destino = request.user.email  # ← el email con el que se registró
+    # Enviar por SendGrid al email del usuario
+    destino = request.user.email
+    enviar_pdf_sendgrid(destino, alumno, pdf_bytes)
 
-    email = EmailMessage(
-        subject="PDF de Alumno",
-        body=f"Aquí están los datos del alumno {alumno.nombre} {alumno.apellido}.",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[email_destino],
-    )
-    email.attach("alumno.pdf", pdf_bytes, "application/pdf")
-    email.send()
-
-    messages.success(request, f"El PDF fue enviado por correo a {email_destino}.")
+    messages.success(request, f"El PDF fue enviado por correo a {destino}.")
     return redirect("alumnos:dashboard")
 
+
+# -------------------------------
+# Editar alumno
+# -------------------------------
 @login_required
 def alumno_editar_view(request, pk):
-    """
-    Editar datos de un alumno propio.
-    """
     alumno = get_object_or_404(Alumno, pk=pk, usuario=request.user)
 
     if request.method == "POST":
@@ -86,11 +127,11 @@ def alumno_editar_view(request, pk):
     })
 
 
+# -------------------------------
+# Eliminar alumno
+# -------------------------------
 @login_required
 def alumno_eliminar_view(request, pk):
-    """
-    Confirmar y eliminar un alumno propio.
-    """
     alumno = get_object_or_404(Alumno, pk=pk, usuario=request.user)
 
     if request.method == "POST":
