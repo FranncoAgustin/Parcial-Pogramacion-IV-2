@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Scraper educativo{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Scraping educativo</h5>
+        <p class="text-muted small">
+          Ingresá una palabra clave y un correo. Se hará una búsqueda en Wikipedia
+          y los resultados se enviarán por email.
+        </p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+
+          {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}
+                <div class="text-danger small">
+                  {{ field.errors|striptags }}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">Buscar y enviar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Resultados (vista previa)</h5>
+
+        {% if resultados %}
+          <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Título</th>
+                  <th>Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for res in resultados %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ res.titulo }}</td>
+                    <td>
+                      <a href="{{ res.link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        Ver
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted small mt-2">
+            Estos mismos resultados fueron enviados al correo indicado.
+          </p>
+        {% else %}
+          <p class="text-muted mb-0">
+            Todavía no hay resultados. Completá el formulario de la izquierda.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
