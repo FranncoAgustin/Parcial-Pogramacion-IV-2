@@ -3,8 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.core.mail import EmailMessage
 from django.contrib import messages
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
 from django.conf import settings
-import io
+from io import BytesIO
 
 from .models import Alumno
 from .forms import AlumnoForm
@@ -28,39 +29,39 @@ def dashboard_view(request):
     })
 
 @login_required
+@login_required
 def enviar_pdf_view(request, pk):
     alumno = get_object_or_404(Alumno, pk=pk, usuario=request.user)
 
-    # 1) Generar PDF en memoria
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer)
-    p.setFont("Helvetica", 14)
-    p.drawString(100, 800, "Datos del Alumno")
-    p.setFont("Helvetica", 12)
-    p.drawString(100, 770, f"Nombre: {alumno.nombre}")
-    p.drawString(100, 750, f"Apellido: {alumno.apellido}")
-    p.drawString(100, 730, f"Email: {alumno.email}")
-    p.drawString(100, 710, f"Legajo: {alumno.legajo}")
-    p.showPage()
-    p.save()
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+
+    pdf.setFont("Helvetica", 14)
+    pdf.drawString(50, 750, "Datos del alumno")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, 720, f"Nombre: {alumno.nombre}")
+    pdf.drawString(50, 700, f"Apellido: {alumno.apellido}")
+    pdf.drawString(50, 680, f"Email: {alumno.email}")
+    pdf.drawString(50, 660, f"Legajo: {alumno.legajo}")
+
+    pdf.showPage()
+    pdf.save()
 
     buffer.seek(0)
-    pdf_bytes = buffer.getvalue()
+    pdf_bytes = buffer.read()
 
-    # 2) Enviar por correo (al docente o al propio usuario)
-    destinatario = request.user.email  # o un EMAIL_DOCENTE fijo en settings
+    email_destino = request.user.email  # ← el email con el que se registró
+
     email = EmailMessage(
         subject="PDF de Alumno",
-        body=f"Envío PDF con los datos del alumno {alumno}.",
+        body=f"Aquí están los datos del alumno {alumno.nombre} {alumno.apellido}.",
         from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[destinatario],
+        to=[email_destino],
     )
     email.attach("alumno.pdf", pdf_bytes, "application/pdf")
     email.send()
 
-    # Podés devolver un mensaje o redirigir:
-    from django.contrib import messages
-    messages.success(request, "PDF enviado por correo.")
+    messages.success(request, f"El PDF fue enviado por correo a {email_destino}.")
     return redirect("alumnos:dashboard")
 
 @login_required

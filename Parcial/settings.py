@@ -164,12 +164,14 @@ LOGOUT_REDIRECT_URL = "cuentas:login"
 # EMAIL
 # =========================
 
+DEBUG = os.environ.get("DEBUG", "True") == "True"
+
 if DEBUG:
-    # En local: ver mails en consola
+    # Local: mails en consola (como ya venías usando)
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     DEFAULT_FROM_EMAIL = "no-reply@parcial.local"
 else:
-    # En Render: SMTP real (si lo configurás)
+    # Producción (Render): usar SMTP real (Gmail u otro)
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
     EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
@@ -177,6 +179,7 @@ else:
     EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
     EMAIL_USE_TLS = True
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+
 
 
 # =========================
